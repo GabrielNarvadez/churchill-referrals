@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body { background: #f7f8fb; color: #11151f; }
+  body { font-family: var(--font-lato), system-ui, -apple-system, sans-serif; line-height: 1.55; }
+  h1, h2, h3 { letter-spacing: -0.2px; }
+}
