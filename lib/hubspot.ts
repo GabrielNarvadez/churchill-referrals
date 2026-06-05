@@ -6,7 +6,29 @@ function pat(): string {
   return t;
 }
 
+function isDryRun(): boolean {
+  return process.env.DRY_RUN === "true" || process.env.DRY_RUN === "1";
+}
+
+function isWriteMethod(method?: string): boolean {
+  return ["POST", "PATCH", "PUT", "DELETE"].includes((method ?? "GET").toUpperCase());
+}
+
+function isReadPath(path: string): boolean {
+  // Search endpoints use POST + body but are read operations.
+  return path.includes("/search");
+}
+
 async function hs(path: string, init?: RequestInit) {
+  if (isDryRun() && isWriteMethod(init?.method) && !isReadPath(path)) {
+    const fakeId = `DRY_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    console.log(`[DRY_RUN] would ${init?.method} ${path}`);
+    if (init?.body) {
+      try { console.log("[DRY_RUN] body:", JSON.stringify(JSON.parse(String(init.body)), null, 2)); }
+      catch { console.log("[DRY_RUN] body:", init.body); }
+    }
+    return { id: fakeId, properties: {}, dryRun: true };
+  }
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -30,6 +52,12 @@ async function hs(path: string, init?: RequestInit) {
 export type AlumniStatus = "alumni" | "prospect" | "unknown";
 
 const ALUMNI_LIFECYCLE_STAGE_ID = "217604175";
+const PURCHASED_LIFECYCLE_STAGES = new Set([
+  ALUMNI_LIFECYCLE_STAGE_ID,
+  "customer",
+  "evangelist",
+  "255982886",
+]);
 
 export type ContactLookup = {
   id: string;
@@ -49,6 +77,8 @@ export async function findContactByEmail(email: string): Promise<ContactLookup |
         "lastname",
         "alumni__c",
         "lifecyclestage",
+        "referred_by___email",
+        "referred_by__c",
       ],
       limit: 1,
     }),
@@ -61,7 +91,7 @@ export function classifyReferrer(contact: ContactLookup | null): AlumniStatus {
   const p = contact.properties;
   const alumni = (p.alumni__c ?? "").toLowerCase();
   if (alumni === "yes" || alumni === "1" || alumni === "true") return "alumni";
-  if (p.lifecyclestage === ALUMNI_LIFECYCLE_STAGE_ID) return "alumni";
+  if (p.lifecyclestage && PURCHASED_LIFECYCLE_STAGES.has(p.lifecyclestage)) return "alumni";
   return "prospect";
 }
 
@@ -82,6 +112,8 @@ export type CreateOrUpdateContactInput = {
 export async function upsertReferredContact(input: CreateOrUpdateContactInput) {
   const properties: Record<string, string> = {
     email: input.email,
+    lifecyclestage: "lead",
+    hs_lead_status: "NEW",
     were_you_referred_to_churchill_by_someone_: "Yes",
     referred_by___email: input.referredByEmail,
     referred_by___first_name: input.referredByFirstName,
@@ -130,6 +162,103 @@ export async function ensureReferrerContact(input: {
     }),
   });
 }
+
+// Referrals Tracking custom object (objectTypeId 2-24976820) → contacts associations.
+// Per 2026-06-03 demo decision: all associations flow through the custom object,
+// not contact-to-contact, to keep the referral lifecycle in one place.
+const REFERRALS_OBJECT_TYPE = "2-24976820";
+const ASSOC_REFERRAL_TO_NEW_CLIENT = 25;
+const ASSOC_REFERRAL_TO_REFERRED_BY = 27;
+
+export type CreateReferralRecordInput = {
+  friendId: string;
+  friendFullName: string;
+  friendLifecycleStage: string;
+  referrerId: string;
+  referrerEmail: string;
+  referrerFirstName: string;
+  referrerFullName: string;
+  referrerPhone?: string;
+  referrerLifecycleStage: string;
+  referralType:
+    | "Churchill Alumni Referral"
+    | "Friends of Churchill Referral"
+    | "Referrer not in system"
+    | "Not yet defined";
+  submissionIdempotentId: string;
+  notes?: string;
+};
+
+export async function createReferralRecord(input: CreateReferralRecordInput) {
+  const today = new Date().toISOString().slice(0, 10);
+  const properties: Record<string, string> = {
+    name: `${input.friendFullName} ← ${input.referrerFullName} (${today})`,
+    referral_type__c: input.referralType,
+    lead_creation_date__c: today,
+    new_client_full_name: input.friendFullName,
+    new_client___full_name: input.friendFullName,
+    new_client_hs_record_id: input.friendId,
+    new_client_lifecycle_stage: input.friendLifecycleStage,
+    referred_by_full_name: input.referrerFullName,
+    referred_by_first_name: input.referrerFirstName,
+    referred_by_email__c: input.referrerEmail,
+    referred_by_client_lifecycle_stage: input.referrerLifecycleStage,
+    submission_idempotent_id: input.submissionIdempotentId,
+  };
+  if (input.referrerPhone) properties.referred_by_phone_number__c = input.referrerPhone;
+  if (input.notes) properties.notes__c = input.notes;
+
+  const referrerIsAccount = input.referrerLifecycleStage === "customer" ||
+    input.referrerLifecycleStage === "217604175" ||
+    input.referrerLifecycleStage === "evangelist" ||
+    input.referrerLifecycleStage === "255982886";
+  if (referrerIsAccount) {
+    properties.referred_by__account__hs_record_id = input.referrerId;
+  } else {
+    properties.referred_by__lead__hs_record_id = input.referrerId;
+  }
+
+  return await hs(`/crm/v3/objects/${REFERRALS_OBJECT_TYPE}`, {
+    method: "POST",
+    body: JSON.stringify({ properties }),
+  });
+}
+
+export async function associateReferralToContact(
+  referralId: string,
+  contactId: string,
+  typeId: number
+) {
+  if (!referralId || !contactId) return null;
+  return await hs(
+    `/crm/v4/objects/${REFERRALS_OBJECT_TYPE}/${referralId}/associations/contacts/${contactId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify([
+        { associationCategory: "USER_DEFINED", associationTypeId: typeId },
+      ]),
+    }
+  );
+}
+
+export async function findExistingReferralByIdempotentId(idempotentId: string) {
+  const body = await hs(`/crm/v3/objects/${REFERRALS_OBJECT_TYPE}/search`, {
+    method: "POST",
+    body: JSON.stringify({
+      filterGroups: [
+        { filters: [{ propertyName: "submission_idempotent_id", operator: "EQ", value: idempotentId }] },
+      ],
+      properties: ["name", "submission_idempotent_id"],
+      limit: 1,
+    }),
+  });
+  return body.results?.[0] ?? null;
+}
+
+export const ASSOC_TYPES = {
+  REFERRAL_TO_NEW_CLIENT: ASSOC_REFERRAL_TO_NEW_CLIENT,
+  REFERRAL_TO_REFERRED_BY: ASSOC_REFERRAL_TO_REFERRED_BY,
+};
 
 export async function addNoteToContact(contactId: string, body: string) {
   const created = await hs("/crm/v3/objects/notes", {

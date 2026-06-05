@@ -14,9 +14,9 @@ export default function Home() {
             <p className="mt-1 text-xl font-black text-navy">Double Referral Reward</p>
             <p className="mt-2 text-sm text-muted">You receive $100. Your friend gets $100 off their first qualification.</p>
           </Link>
-          <Link href="/friends" className="block rounded-lg border border-line border-t-4 border-t-red bg-white p-6 transition hover:shadow-md">
+          <Link href="/friends" className="block rounded-lg border border-line border-t-4 border-t-accent bg-white p-6 transition hover:shadow-md">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Prospect</p>
-            <p className="mt-1 text-xl font-black text-red">Friends of Churchill</p>
+            <p className="mt-1 text-xl font-black text-accent">Friends of Churchill</p>
             <p className="mt-2 text-sm text-muted">Refer a friend before your own enrolment and earn $50.</p>
           </Link>
         </div>

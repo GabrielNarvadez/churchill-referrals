@@ -4,8 +4,11 @@ import {
   findContactByEmail,
   classifyReferrer,
   upsertReferredContact,
-  ensureReferrerContact,
   addNoteToContact,
+  createReferralRecord,
+  associateReferralToContact,
+  findExistingReferralByIdempotentId,
+  ASSOC_TYPES,
 } from "@/lib/hubspot";
 
 export const runtime = "nodejs";
@@ -13,8 +16,10 @@ export const runtime = "nodejs";
 const PayloadSchema = z.object({
   program: z.enum(["double", "friends"]),
   referrer_email: z.string().email().transform((v) => v.trim().toLowerCase()),
-  referrer_name: z.string().min(1).max(120).transform((v) => v.trim()),
-  friend_name: z.string().min(1).max(120).transform((v) => v.trim()),
+  referrer_first_name: z.string().min(1).max(60).transform((v) => v.trim()),
+  referrer_last_name: z.string().min(1).max(60).transform((v) => v.trim()),
+  friend_first_name: z.string().min(1).max(60).transform((v) => v.trim()),
+  friend_last_name: z.string().min(1).max(60).transform((v) => v.trim()),
   friend_email: z.string().email().transform((v) => v.trim().toLowerCase()),
   friend_phone: z.string().min(5).max(30).transform((v) => v.trim()),
   notes: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
@@ -22,12 +27,6 @@ const PayloadSchema = z.object({
     errorMap: () => ({ message: "You must confirm you have permission to share your friend's details." }),
   }),
 });
-
-function splitName(full: string): { first: string; last: string } {
-  const parts = full.trim().split(/\s+/);
-  if (parts.length === 1) return { first: parts[0], last: "" };
-  return { first: parts[0], last: parts.slice(1).join(" ") };
-}
 
 export async function POST(req: NextRequest) {
   let parsed;
@@ -48,11 +47,55 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const referrerName = splitName(parsed.referrer_name);
-  const friendName = splitName(parsed.friend_name);
+  const referrerFullName = `${parsed.referrer_first_name} ${parsed.referrer_last_name}`.trim();
 
-  let referrer = await findContactByEmail(parsed.referrer_email);
+  const existingFriend = await findContactByEmail(parsed.friend_email);
+  if (existingFriend) {
+    const existingReferrer = (existingFriend.properties.referred_by___email ?? "").toLowerCase();
+    if (existingReferrer && existingReferrer === parsed.referrer_email) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "already_referred_by_you",
+          message: `You've already referred ${parsed.friend_first_name} — we have them on record from your earlier referral. There's nothing more to do, we'll be in touch when they enrol.`,
+        },
+        { status: 409 }
+      );
+    }
+    if (existingReferrer) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "already_referred_by_someone_else",
+          message: `Thanks for thinking of ${parsed.friend_first_name}! They've already been referred to Churchill by someone else, so a second referral reward can't be applied. If you believe this is a mistake, get in touch and we'll review.`,
+        },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "friend_already_in_system",
+        message: `Thanks for thinking of ${parsed.friend_first_name}! It looks like they're already in our records, so we can't apply a referral reward for them this time. Referrals can only be made for people new to Churchill. If you think this is a mistake, get in touch and we'll take a look.`,
+      },
+      { status: 409 }
+    );
+  }
+
+  const referrer = await findContactByEmail(parsed.referrer_email);
   const status = classifyReferrer(referrer);
+
+  if (status === "unknown" || !referrer) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "referrer_not_in_system",
+        message:
+          "We couldn't find your email in our Churchill records. To refer a friend you need to be a Churchill contact first — try the email you used when you originally enquired or enrolled. If you've never been in touch with us before, get in touch and we'll get you set up.",
+      },
+      { status: 403 }
+    );
+  }
 
   if (parsed.program === "double" && status !== "alumni") {
     return NextResponse.json(
@@ -67,29 +110,61 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!referrer) {
-    referrer = (await ensureReferrerContact({
-      email: parsed.referrer_email,
-      firstname: referrerName.first,
-      lastname: referrerName.last,
-    })) as any;
+  const programSource = parsed.program === "double" ? "double_referral" : "friends_of_churchill";
+  const referralType =
+    parsed.program === "double" ? "Churchill Alumni Referral" : "Friends of Churchill Referral";
+  const idempotentId = `${parsed.referrer_email}|${parsed.friend_email}|${programSource}`;
+
+  const existingReferral = await findExistingReferralByIdempotentId(idempotentId);
+  if (existingReferral) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "duplicate_referral_submission",
+        message: `You've already submitted this referral for ${parsed.friend_first_name}. We've got it on record — no action needed.`,
+      },
+      { status: 409 }
+    );
   }
 
-  const programSource = parsed.program === "double" ? "double_referral" : "friends_of_churchill";
-
-  await upsertReferredContact({
+  const friend = await upsertReferredContact({
     email: parsed.friend_email,
-    firstname: friendName.first,
-    lastname: friendName.last,
+    firstname: parsed.friend_first_name,
+    lastname: parsed.friend_last_name,
     phone: parsed.friend_phone,
     referredByEmail: parsed.referrer_email,
-    referredByFirstName: referrerName.first,
-    referredByLastName: referrerName.last,
-    referredByFullName: parsed.referrer_name,
+    referredByFirstName: parsed.referrer_first_name,
+    referredByLastName: parsed.referrer_last_name,
+    referredByFullName: referrerFullName,
     referrerIsAlumni: status === "alumni",
     programSource,
     notes: parsed.notes,
   });
+
+  let referralId: string | undefined;
+  if (friend?.id && referrer?.id) {
+    const referrerLifecycleStage = referrer.properties.lifecyclestage ?? "lead";
+    const referral = await createReferralRecord({
+      friendId: friend.id,
+      friendFullName: `${parsed.friend_first_name} ${parsed.friend_last_name}`.trim(),
+      friendLifecycleStage: "lead",
+      referrerId: referrer.id,
+      referrerEmail: parsed.referrer_email,
+      referrerFirstName: parsed.referrer_first_name,
+      referrerFullName: referrerFullName,
+      referrerPhone: undefined,
+      referrerLifecycleStage,
+      referralType,
+      submissionIdempotentId: idempotentId,
+      notes: parsed.notes,
+    });
+    referralId = referral?.id;
+
+    if (referralId) {
+      await associateReferralToContact(referralId, friend.id, ASSOC_TYPES.REFERRAL_TO_NEW_CLIENT);
+      await associateReferralToContact(referralId, referrer.id, ASSOC_TYPES.REFERRAL_TO_REFERRED_BY);
+    }
+  }
 
   if (parsed.notes && referrer?.id) {
     await addNoteToContact(
@@ -103,5 +178,6 @@ export async function POST(req: NextRequest) {
     program: parsed.program,
     referrer_status: status,
     reward: parsed.program === "double" ? 100 : 50,
+    referral_id: referralId,
   });
 }

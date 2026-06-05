@@ -12,7 +12,7 @@ export default function FriendsReferral() {
       <ChurchillHeader />
       <main className="mx-auto max-w-5xl px-6 py-12">
         <section className="text-center">
-          <p className="text-xs font-bold uppercase tracking-[2px] text-red">Exploring Churchill</p>
+          <p className="text-xs font-bold uppercase tracking-[2px] text-accent">Exploring Churchill</p>
           <h1 className="mt-2 text-4xl font-black leading-tight text-navy sm:text-5xl">
             Friends of Churchill Referral Reward
           </h1>
@@ -22,9 +22,9 @@ export default function FriendsReferral() {
         </section>
 
         <section className="mt-10">
-          <div className="mx-auto max-w-md rounded-lg border border-line border-t-4 border-t-red bg-white p-6 text-center">
+          <div className="mx-auto max-w-md rounded-lg border border-line border-t-4 border-t-accent bg-white p-6 text-center">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Your reward</p>
-            <p className="mt-1 text-3xl font-black text-red">$50 referral reward</p>
+            <p className="mt-1 text-3xl font-black text-accent">$50 referral reward</p>
             <p className="mt-2 text-sm text-muted">Paid once your friend successfully enrols.</p>
           </div>
         </section>
@@ -50,7 +50,7 @@ export default function FriendsReferral() {
           <h2 className="text-2xl font-black text-navy">Refer a friend now</h2>
           <p className="mt-2 text-sm text-muted">
             Already a Churchill alumni? You qualify for the higher reward —{" "}
-            <a href="/double" className="font-bold text-red underline">switch to the Double Referral Program</a>.
+            <a href="/double" className="font-bold text-accent underline">switch to the Double Referral Program</a>.
           </p>
           <div className="mt-6">
             <ReferralForm program="friends" />
