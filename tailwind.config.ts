@@ -22,4 +22,3 @@ export default {
   },
   plugins: [],
 } satisfies Config;
-// brand applied 2026-06-05T07:04:54Z
