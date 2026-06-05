@@ -73,7 +73,7 @@ export default function DoubleReferral() {
             </div>
             <div>
               <dt className="font-bold text-navy">How does my friend get the $100 discount?</dt>
-              <dd className="mt-1 text-ink">It's automatically applied to their qualification fee during enrolment by our SMT.</dd>
+              <dd className="mt-1 text-ink">It's automatically applied to their qualification fee during enrolment by our team.</dd>
             </div>
             <div>
               <dt className="font-bold text-navy">Can I refer more than one friend?</dt>

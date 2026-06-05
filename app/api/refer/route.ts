@@ -8,6 +8,7 @@ import {
   createReferralRecord,
   associateReferralToContact,
   findExistingReferralByIdempotentId,
+  deleteContact,
   ASSOC_TYPES,
 } from "@/lib/hubspot";
 
@@ -144,33 +145,53 @@ export async function POST(req: NextRequest) {
   let referralId: string | undefined;
   if (friend?.id && referrer?.id) {
     const referrerLifecycleStage = referrer.properties.lifecyclestage ?? "lead";
-    const referral = await createReferralRecord({
-      friendId: friend.id,
-      friendFullName: `${parsed.friend_first_name} ${parsed.friend_last_name}`.trim(),
-      friendLifecycleStage: "lead",
-      referrerId: referrer.id,
-      referrerEmail: parsed.referrer_email,
-      referrerFirstName: parsed.referrer_first_name,
-      referrerFullName: referrerFullName,
-      referrerPhone: undefined,
-      referrerLifecycleStage,
-      referralType,
-      submissionIdempotentId: idempotentId,
-      notes: parsed.notes,
-    });
-    referralId = referral?.id;
+    try {
+      const referral = await createReferralRecord({
+        friendId: friend.id,
+        friendFullName: `${parsed.friend_first_name} ${parsed.friend_last_name}`.trim(),
+        friendLifecycleStage: "lead",
+        referrerId: referrer.id,
+        referrerEmail: parsed.referrer_email,
+        referrerFirstName: parsed.referrer_first_name,
+        referrerFullName: referrerFullName,
+        referrerPhone: undefined,
+        referrerLifecycleStage,
+        referralType,
+        submissionIdempotentId: idempotentId,
+        notes: parsed.notes,
+      });
+      referralId = referral?.id;
 
-    if (referralId) {
-      await associateReferralToContact(referralId, friend.id, ASSOC_TYPES.REFERRAL_TO_NEW_CLIENT);
-      await associateReferralToContact(referralId, referrer.id, ASSOC_TYPES.REFERRAL_TO_REFERRED_BY);
+      if (referralId) {
+        await associateReferralToContact(referralId, friend.id, ASSOC_TYPES.REFERRAL_TO_NEW_CLIENT);
+        await associateReferralToContact(referralId, referrer.id, ASSOC_TYPES.REFERRAL_TO_REFERRED_BY);
+      }
+    } catch (e: any) {
+      // Rollback the friend contact so a retry doesn't hit "already in system"
+      try { await deleteContact(friend.id); } catch { /* ignore */ }
+
+      const isScopeIssue = e?.status === 403 || e?.body?.category === "MISSING_SCOPES";
+      console.error("Referral write failed", { status: e?.status, body: e?.body });
+      return NextResponse.json(
+        {
+          ok: false,
+          code: isScopeIssue ? "config_missing_scope" : "referral_write_failed",
+          message: isScopeIssue
+            ? "Our referral system isn't fully connected yet — please try again shortly. If this keeps happening, get in touch with the Churchill team."
+            : "We hit a snag saving your referral. Please try again in a minute. If it keeps happening, get in touch with the Churchill team.",
+        },
+        { status: 503 }
+      );
     }
   }
 
   if (parsed.notes && referrer?.id) {
-    await addNoteToContact(
-      referrer.id,
-      `Referral submitted (${programSource}). Note from referrer: ${parsed.notes}`
-    );
+    try {
+      await addNoteToContact(
+        referrer.id,
+        `Referral submitted (${programSource}). Note from referrer: ${parsed.notes}`
+      );
+    } catch { /* note failure is non-fatal */ }
   }
 
   return NextResponse.json({

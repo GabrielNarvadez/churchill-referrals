@@ -260,6 +260,11 @@ export const ASSOC_TYPES = {
   REFERRAL_TO_REFERRED_BY: ASSOC_REFERRAL_TO_REFERRED_BY,
 };
 
+export async function deleteContact(contactId: string) {
+  if (!contactId) return null;
+  return await hs(`/crm/v3/objects/contacts/${contactId}`, { method: "DELETE" });
+}
+
 export async function addNoteToContact(contactId: string, body: string) {
   const created = await hs("/crm/v3/objects/notes", {
     method: "POST",

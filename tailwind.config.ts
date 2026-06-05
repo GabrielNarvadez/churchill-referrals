@@ -5,15 +5,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: "#1e3567",
+        navy: "#203367",
         "navy-deep": "#000b3f",
         "navy-soft": "#485b8f",
-        accent: "#EF6B51",
+        accent: "#E31F26",
         ink: "#494A52",
         "ink-strong": "#282828",
         muted: "#5a6473",
         line: "#E6E6E6",
-        bg: "#f8fafc",
+        bg: "#F2F2F2",
       },
       fontFamily: {
         sans: ["var(--font-lato)", "system-ui", "sans-serif"],
