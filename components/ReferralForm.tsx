@@ -49,7 +49,9 @@ export function ReferralForm({ program }: Props) {
       setServerError(data.message ?? "Something went wrong. Please try again.");
       if (data.redirect) setRedirectAfterError(data.redirect);
     } catch {
-      setServerError("Network error. Please check your connection and try again.");
+      setServerError(
+        "We couldn't confirm if your referral went through. Give us a minute, then refresh and check your email before submitting again — your referral may already be on its way."
+      );
     } finally {
       setSubmitting(false);
     }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/hubspot";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const PayloadSchema = z.object({
   program: z.enum(["double", "friends"]),
@@ -50,7 +51,17 @@ export async function POST(req: NextRequest) {
 
   const referrerFullName = `${parsed.referrer_first_name} ${parsed.referrer_last_name}`.trim();
 
-  const existingFriend = await findContactByEmail(parsed.friend_email);
+  const programSource = parsed.program === "double" ? "double_referral" : "friends_of_churchill";
+  const referralType =
+    parsed.program === "double" ? "Churchill Alumni Referral" : "Friends of Churchill Referral";
+  const idempotentId = `${parsed.referrer_email}|${parsed.friend_email}|${programSource}`;
+
+  const [existingFriend, referrer, existingReferral] = await Promise.all([
+    findContactByEmail(parsed.friend_email),
+    findContactByEmail(parsed.referrer_email),
+    findExistingReferralByIdempotentId(idempotentId),
+  ]);
+
   if (existingFriend) {
     const existingReferrer = (existingFriend.properties.referred_by___email ?? "").toLowerCase();
     if (existingReferrer && existingReferrer === parsed.referrer_email) {
@@ -83,7 +94,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const referrer = await findContactByEmail(parsed.referrer_email);
   const status = classifyReferrer(referrer);
 
   if (status === "unknown" || !referrer) {
@@ -111,12 +121,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const programSource = parsed.program === "double" ? "double_referral" : "friends_of_churchill";
-  const referralType =
-    parsed.program === "double" ? "Churchill Alumni Referral" : "Friends of Churchill Referral";
-  const idempotentId = `${parsed.referrer_email}|${parsed.friend_email}|${programSource}`;
-
-  const existingReferral = await findExistingReferralByIdempotentId(idempotentId);
   if (existingReferral) {
     return NextResponse.json(
       {
@@ -163,8 +167,10 @@ export async function POST(req: NextRequest) {
       referralId = referral?.id;
 
       if (referralId) {
-        await associateReferralToContact(referralId, friend.id, ASSOC_TYPES.REFERRAL_TO_NEW_CLIENT);
-        await associateReferralToContact(referralId, referrer.id, ASSOC_TYPES.REFERRAL_TO_REFERRED_BY);
+        await Promise.all([
+          associateReferralToContact(referralId, friend.id, ASSOC_TYPES.REFERRAL_TO_NEW_CLIENT),
+          associateReferralToContact(referralId, referrer.id, ASSOC_TYPES.REFERRAL_TO_REFERRED_BY),
+        ]);
       }
     } catch (e: any) {
       // Rollback the friend contact so a retry doesn't hit "already in system"
