@@ -65,12 +65,20 @@ export default function FriendsReferral() {
               <dd className="mt-1 text-ink">Anyone currently exploring qualification opportunities with Churchill Education, who hasn't yet purchased their first qualification.</dd>
             </div>
             <div>
-              <dt className="font-bold text-navy">Does my friend need to enrol before me?</dt>
-              <dd className="mt-1 text-ink">Yes — your friend must enrol before your own first qualification purchase.</dd>
+              <dt className="font-bold text-navy">When do I receive my $50 reward?</dt>
+              <dd className="mt-1 text-ink">Once your referred friend successfully enrols in their first qualification with Churchill.</dd>
             </div>
             <div>
               <dt className="font-bold text-navy">Do I need to purchase anything to participate?</dt>
               <dd className="mt-1 text-ink">No purchase is required to join. You can refer first.</dd>
+            </div>
+            <div>
+              <dt className="font-bold text-navy">How do I become an Alumni?</dt>
+              <dd className="mt-1 text-ink">Anyone who graduates with a qualification through Churchill Education automatically becomes an Alumni. As an Alumni you are eligible to receive a higher reward for referring a friend.</dd>
+            </div>
+            <div>
+              <dt className="font-bold text-navy">Can I refer more than one friend?</dt>
+              <dd className="mt-1 text-ink">Yes — there&apos;s currently no cap. You earn $50 for each qualified referral.</dd>
             </div>
           </dl>
         </section>
