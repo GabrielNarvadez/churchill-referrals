@@ -191,18 +191,16 @@ export type CreateReferralRecordInput = {
 
 export async function createReferralRecord(input: CreateReferralRecordInput) {
   const today = new Date().toISOString().slice(0, 10);
+  // new_client___full_name, new_client_lifecycle_stage, referred_by_full_name,
+  // referred_by_first_name, referred_by_client_lifecycle_stage are calculated
+  // on the custom object — HubSpot rejects writes to them.
   const properties: Record<string, string> = {
     name: `${input.friendFullName} ← ${input.referrerFullName} (${today})`,
     referral_type__c: input.referralType,
     lead_creation_date__c: today,
     new_client_full_name: input.friendFullName,
-    new_client___full_name: input.friendFullName,
     new_client_hs_record_id: input.friendId,
-    new_client_lifecycle_stage: input.friendLifecycleStage,
-    referred_by_full_name: input.referrerFullName,
-    referred_by_first_name: input.referrerFirstName,
     referred_by_email__c: input.referrerEmail,
-    referred_by_client_lifecycle_stage: input.referrerLifecycleStage,
     submission_idempotent_id: input.submissionIdempotentId,
   };
   if (input.referrerPhone) properties.referred_by_phone_number__c = input.referrerPhone;
