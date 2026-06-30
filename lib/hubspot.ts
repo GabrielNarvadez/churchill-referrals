@@ -172,6 +172,7 @@ export async function markReferrerSubmitted(input: {
   contactId: string;
   programSource: "double_referral" | "friends_of_churchill";
   submittedAt: string;
+  friendFirstName: string;
 }) {
   return await hs(`/crm/v3/objects/contacts/${input.contactId}`, {
     method: "PATCH",
@@ -179,6 +180,7 @@ export async function markReferrerSubmitted(input: {
       properties: {
         last_referral_program_source: input.programSource,
         last_referral_submitted_at: input.submittedAt,
+        last_referred_friend_firstname: input.friendFirstName,
       },
     }),
   });

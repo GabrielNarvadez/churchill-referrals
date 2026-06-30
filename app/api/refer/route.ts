@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
         contactId: referrer.id,
         programSource,
         submittedAt: new Date().toISOString(),
+        friendFirstName: parsed.friend_first_name,
       });
     } catch (e) {
       console.error("markReferrerSubmitted failed", e);
