@@ -2,8 +2,8 @@ import { ChurchillFooter, ChurchillHeader } from "@/components/ChurchillHeader";
 import { ReferralForm } from "@/components/ReferralForm";
 
 export const metadata = {
-  title: "Friends of Churchill Referral — Churchill Education",
-  description: "Refer a friend before your own enrolment and earn a $50 reward.",
+  title: "Friends of Churchill Referral Rewards — Churchill Education",
+  description: "Refer a friend and earn rewards when they enrol and pay for their first qualification – even before you do!",
 };
 
 export default function FriendsReferral() {
@@ -14,10 +14,10 @@ export default function FriendsReferral() {
         <section className="text-center">
           <p className="text-xs font-bold uppercase tracking-[2px] text-accent">Exploring Churchill</p>
           <h1 className="mt-2 text-4xl font-black leading-tight text-navy sm:text-5xl">
-            Friends of Churchill Referral Reward
+            Friends of Churchill Referral Rewards
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-ink">
-            Refer a friend and earn rewards when they successfully enrol — even <strong>before</strong> you complete your own first qualification purchase.
+            Refer a friend and earn rewards when they enrol and pay for their first qualification – even <strong>before</strong> you do!
           </p>
         </section>
 
@@ -31,11 +31,11 @@ export default function FriendsReferral() {
 
         <section className="mt-12">
           <h2 className="text-2xl font-black text-navy">How it works</h2>
-          <ol className="mt-4 grid gap-4 sm:grid-cols-2">
+          <ol className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ["1. Submit referral details", "Send us your friend's details using the form below."],
               ["2. We contact your friend", "Our team reaches out and discusses qualification options."],
-              ["3. Your friend enrols", "Your friend enrols in a qualification before you do."],
+              ["3. Your friend enrols", "Your friend enrols and pays for their first qualification with Churchill Education."],
               ["4. You receive $50", "Your reward is processed after their enrolment is confirmed."],
             ].map(([title, body]) => (
               <li key={title} className="rounded-lg border border-line bg-white p-5">
@@ -48,10 +48,6 @@ export default function FriendsReferral() {
 
         <section className="mt-12">
           <h2 className="text-2xl font-black text-navy">Refer a friend now</h2>
-          <p className="mt-2 text-sm text-muted">
-            Already a Churchill alumni? You qualify for the higher reward —{" "}
-            <a href="/double" className="font-bold text-accent underline">switch to the Double Referral Program</a>.
-          </p>
           <div className="mt-6">
             <ReferralForm program="friends" />
           </div>
@@ -62,11 +58,11 @@ export default function FriendsReferral() {
           <dl className="mt-4 grid gap-5 text-sm">
             <div>
               <dt className="font-bold text-navy">Who can join this program?</dt>
-              <dd className="mt-1 text-ink">Anyone currently exploring qualification opportunities with Churchill Education, who hasn't yet purchased their first qualification.</dd>
+              <dd className="mt-1 text-ink">A Friend of Churchill is someone who has contacted us to talk about Recognition of Prior Learning but has not enrolled in any qualifications (yet!)</dd>
             </div>
             <div>
               <dt className="font-bold text-navy">When do I receive my $50 reward?</dt>
-              <dd className="mt-1 text-ink">Once your referred friend successfully enrols in their first qualification with Churchill.</dd>
+              <dd className="mt-1 text-ink">Once your referred friend enrols and pays for their first qualification with Churchill Education, you will receive an email notification asking how you would like to receive your reward.</dd>
             </div>
             <div>
               <dt className="font-bold text-navy">Do I need to purchase anything to participate?</dt>
