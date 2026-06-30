@@ -4,6 +4,7 @@ import {
   findContactByEmail,
   classifyReferrer,
   upsertReferredContact,
+  markReferrerSubmitted,
   addNoteToContact,
   createReferralRecord,
   associateReferralToContact,
@@ -145,6 +146,21 @@ export async function POST(req: NextRequest) {
     programSource,
     notes: parsed.notes,
   });
+
+  // Stamp the referrer-side trigger props so Workflow B ("Thanks For Your
+  // Referral") fires. referrer is guaranteed present here (403'd earlier if not).
+  // Best-effort: a failure here must not fail the referral the user just made.
+  if (referrer?.id) {
+    try {
+      await markReferrerSubmitted({
+        contactId: referrer.id,
+        programSource,
+        submittedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error("markReferrerSubmitted failed", e);
+    }
+  }
 
   let referralId: string | undefined;
   if (friend?.id && referrer?.id) {

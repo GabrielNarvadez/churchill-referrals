@@ -163,6 +163,27 @@ export async function ensureReferrerContact(input: {
   });
 }
 
+// Stamps the trigger properties for the referrer-side "Thanks For Your Referral"
+// workflow (Workflow B). The referrer is always an existing contact by the time
+// we call this — the route 403s earlier if their email isn't in HubSpot — so we
+// PATCH by id. last_referral_submitted_at carries ms precision so it changes on
+// every submission, which is what fires re-enrolment for repeat referrers.
+export async function markReferrerSubmitted(input: {
+  contactId: string;
+  programSource: "double_referral" | "friends_of_churchill";
+  submittedAt: string;
+}) {
+  return await hs(`/crm/v3/objects/contacts/${input.contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      properties: {
+        last_referral_program_source: input.programSource,
+        last_referral_submitted_at: input.submittedAt,
+      },
+    }),
+  });
+}
+
 // Referrals Tracking custom object (objectTypeId 2-24976820) → contacts associations.
 // Per 2026-06-03 demo decision: all associations flow through the custom object,
 // not contact-to-contact, to keep the referral lifecycle in one place.
